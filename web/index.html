@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DocDesk Simulator</title>
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true"></span>
+    <div>
+      <div class="name">DocDesk <span class="for">for __BRAND__</span></div>
+      <div class="sub">Help-centre add-on for Alexa+ &middot; simulated host</div>
+    </div>
+  </div>
+  <div class="badges">
+    <span class="badge" id="proto">MCP &middot; connecting</span>
+    <span class="badge" id="mode">answers: ...</span>
+    <a class="badge link" href="/console" target="_blank" rel="noopener">Support console &#8599;</a>
+  </div>
+</header>
+
+<main class="layout">
+  <section class="device-col">
+    <div class="profiles" role="tablist" aria-label="Who is speaking">
+      <button role="tab" data-profile="ada" class="active">Ada <small>customer</small></button>
+      <button role="tab" data-profile="tunde">Tunde <small>customer</small></button>
+      <button role="tab" data-profile="staff">Brightline team <small>staff</small></button>
+    </div>
+
+    <div class="device">
+      <div class="lightbar" id="lightbar"></div>
+      <div class="screen" id="conversation" aria-live="polite"></div>
+      <form class="composer" id="composer" autocomplete="off">
+        <button type="button" class="mic" id="mic" title="Speak (Chrome)" aria-label="Speak">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z"/></svg>
+        </button>
+        <input id="utterance" placeholder="Say something to Alexa..." aria-label="What you say to Alexa">
+        <button type="submit" class="send">Send</button>
+      </form>
+    </div>
+
+    <div class="chips" id="chips"></div>
+  </section>
+
+  <section class="inspector">
+    <div class="inspector-head">
+      <h2>What the host is doing</h2>
+      <div class="controls">
+        <label>Host brain
+          <select id="planner">
+            <option value="rules">Rules (offline)</option>
+            <option value="claude">Claude picks the tool</option>
+          </select>
+        </label>
+        <label class="toggle"><input type="checkbox" id="speak" checked> Read replies aloud</label>
+      </div>
+    </div>
+    <ol class="steps" id="steps"></ol>
+    <h3>MCP traffic <span class="muted" id="session"></span></h3>
+    <div class="traffic" id="traffic"></div>
+  </section>
+</main>
+
+<script>window.DOCDESK = { staffToken: "__STAFF_TOKEN__" };</script>
+<script src="/static/mcp-client.js"></script>
+<script src="/static/apps-host.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+.env
+.venv/
+.venv-strands/
+data/
+*.db
+*.db-journal
+__pycache__/
+.pytest_cache/
+demo-video/

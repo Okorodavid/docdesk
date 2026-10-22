@@ -1,0 +1,10 @@
+[project]
+name = "docdesk"
+version = "1.0.0"
+description = "DocDesk: a help-centre add-on for Alexa+. Self-hosted MCP server with cited answers, tickets that persist across sessions, and doc-gap reports."
+requires-python = ">=3.11"
+license = { text = "MIT" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+<head><title>Bridge FAQ | Example Protocol Docs</title></head>
+<body>
+<header><a href="/">Example Protocol</a> <a href="/docs/staking">Staking</a></header>
+<nav><ul><li><a href="/docs/bridge">Bridge</a></li><li><a href="/docs/staking">Staking</a></li><li><a href="https://twitter.com/example">Twitter</a></li></ul></nav>
+<main>
+  <h1>Bridge FAQ</h1>
+  <p>The Example bridge moves ETH and USDC between Ethereum mainnet and Example Chain.</p>
+  <h2 id="withdrawal-time">How long do withdrawals take?</h2>
+  <p>Withdrawals from Example Chain to Ethereum take 7 days because of the fraud-proof challenge window.</p>
+  <p>Deposits from Ethereum to Example Chain usually arrive in about 15 minutes.</p>
+  <h2 id="stuck-transaction"><a href="#stuck-transaction">My bridge transaction is stuck pending</a></h2>
+  <ul>
+    <li>Check the transaction hash on the Example Chain explorer.</li>
+    <li>If it shows <code>Ready to prove</code>, click <strong>Prove</strong> in the bridge app.</li>
+  </ul>
+  <pre>bridge status --tx 0xabc123</pre>
+  <h2 id="fees">Bridge fees</h2>
+  <p>There is no bridge fee. You only pay network gas on each side.</p>
+</main>
+<footer>Copyright Example Labs. <a href="/docs/terms">Terms</a></footer>
+<script>window.analytics = "should not be indexed";</script>
+</body>
+</html>

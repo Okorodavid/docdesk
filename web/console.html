@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DocDesk Console</title>
+<link rel="stylesheet" href="/static/styles.css">
+<style>
+  .console { max-width: 1200px; margin: 0 auto; padding: 24px; display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 24px; }
+  @media (max-width: 900px) { .console { grid-template-columns: 1fr; padding: 16px; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; }
+  .panel h2 { margin: 0 0 4px; font-size: 16px; }
+  .panel p.hint { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
+  .tk { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
+  .tk.new { animation: flash 2s ease-out; }
+  @keyframes flash { from { box-shadow: 0 0 0 3px #36c6f0; } to { box-shadow: 0 0 0 0 transparent; } }
+  .tk-head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .tk-head b { font-variant-numeric: tabular-nums; }
+  .who { color: var(--muted); font-size: 13px; }
+  .pill { font-size: 11px; padding: 2px 8px; border-radius: 99px; margin-left: auto; }
+  .pill.open { background: #fff4e0; color: #9a5b00; }
+  .pill.done { background: #e8f5ee; color: #1f7a4d; }
+  @media (prefers-color-scheme: dark) { .pill.open { background: #3a2a10; color: #ffc46b; } .pill.done { background: #173326; color: #6fd39e; } }
+  .tk .q { margin: 6px 0; }
+  .tk .res { font-size: 14px; color: var(--muted); border-left: 3px solid var(--line); padding-left: 10px; margin-top: 6px; }
+  .reply { display: flex; gap: 8px; margin-top: 8px; }
+  .reply input { flex: 1; min-width: 0; }
+  input[type=text], textarea { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; background: var(--page); }
+  textarea { min-height: 110px; resize: vertical; }
+  label.f { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+  .btn { border: 0; border-radius: 10px; padding: 9px 14px; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; }
+  .btn.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); font-weight: 500; }
+  .row { display: flex; gap: 8px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+  .note { font-size: 14px; margin-top: 10px; }
+  .note.good { color: #1f7a4d; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  td { padding: 7px 4px; border-top: 1px solid var(--line); vertical-align: top; }
+  td.n { text-align: right; width: 3em; font-variant-numeric: tabular-nums; }
+  .ex { color: var(--muted); font-size: 12px; }
+  .stack { display: grid; gap: 24px; align-content: start; }
+  .empty-note { color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true"></span>
+    <div>
+      <div class="name">DocDesk console <span class="for">for __BRAND__</span></div>
+      <div class="sub">What the support team sees</div>
+    </div>
+  </div>
+  <div class="badges">
+    <a class="badge link" href="/" target="_blank" rel="noopener">Alexa+ simulator &#8599;</a>
+    <button class="btn ghost" id="reset" type="button">Reset demo</button>
+  </div>
+</header>
+
+<main class="console">
+  <section class="panel">
+    <h2>Tickets</h2>
+    <p class="hint">Questions the help centre could not answer. Reply here, or publish an article that answers them.</p>
+    <div id="tickets"><p class="empty-note">Loading...</p></div>
+  </section>
+
+  <div class="stack">
+    <section class="panel">
+      <h2>Publish a help article</h2>
+      <p class="hint">DocDesk indexes it right away, then re-checks every open ticket against it.</p>
+      <form id="article">
+        <label class="f" for="a-title">Article title</label>
+        <input type="text" id="a-title" placeholder="Payment methods">
+        <label class="f" for="a-heading">Section heading</label>
+        <input type="text" id="a-heading" placeholder="Pay with mobile money">
+        <label class="f" for="a-body">Text</label>
+        <textarea id="a-body" placeholder="You can pay your Brightline bill with mobile money..."></textarea>
+        <div class="row">
+          <button class="btn" type="submit">Publish and re-check tickets</button>
+          <button class="btn ghost" type="button" id="fill">Fill example</button>
+        </div>
+        <div class="note" id="a-note" aria-live="polite"></div>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>Doc gaps, last 7 days</h2>
+      <p class="hint" id="gap-summary">What customers asked that the docs did not cover.</p>
+      <div id="gaps"></div>
+    </section>
+  </div>
+</main>
+
+<script>
+(function () {
+  var TOKEN = "__STAFF_TOKEN__";
+  var H = { "Content-Type": "application/json", "X-DocDesk-Staff": TOKEN };
+  var seen = {};
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function api(path, opts) {
+    opts = opts || {};
+    opts.headers = H;
+    return fetch(path, opts).then(function (r) { return r.json(); });
+  }
+  function when(ts) { return new Date(ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); }
+  var LABEL = { open: "Open", answered_by_docs: "Answered by a new article", resolved_by_agent: "Replied by support", closed: "Closed" };
+
+  function drawTickets(list) {
+    var box = $("tickets");
+    if (!list.length) { box.innerHTML = '<p class="empty-note">No tickets yet. Ask the simulator something the docs don\'t cover.</p>'; return; }
+    var focused = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.id;
+    var drafts = {};
+    box.querySelectorAll(".reply input").forEach(function (i) { drafts[i.dataset.id] = i.value; });
+    box.innerHTML = list.map(function (t) {
+      var open = t.status === "open";
+      var fresh = seen[t.id] !== undefined && seen[t.id] !== t.status || (seen[t.id] === undefined && Object.keys(seen).length);
+      return '<div class="tk' + (fresh ? " new" : "") + '"><div class="tk-head"><b>#' + t.id + '</b><span class="who">' + esc(t.customer_id) +
+        " &middot; " + when(t.created_at) + '</span><span class="pill ' + (open ? "open" : "done") + '">' + LABEL[t.status] + "</span></div>" +
+        '<div class="q">' + esc(t.question) + "</div>" +
+        (t.details ? '<div class="who">Customer added: ' + esc(t.details) + "</div>" : "") +
+        (t.resolution ? '<div class="res">' + esc(t.resolution) + "</div>" : "") +
+        (open ? '<form class="reply" data-id="' + t.id + '"><input type="text" data-id="' + t.id + '" placeholder="Reply to the customer..."><button class="btn">Send</button></form>' : "") +
+        "</div>";
+    }).join("");
+    list.forEach(function (t) { seen[t.id] = t.status; });
+    box.querySelectorAll(".reply input").forEach(function (i) {
+      if (drafts[i.dataset.id]) i.value = drafts[i.dataset.id];
+      if (focused === i.dataset.id) i.focus();
+    });
+    box.querySelectorAll(".reply").forEach(function (f) {
+      f.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var text = f.querySelector("input").value.trim();
+        if (!text) return;
+        api("/api/tickets/" + f.dataset.id + "/reply", { method: "POST", body: JSON.stringify({ text: text, agent: "Brightline support" }) })
+          .then(refresh);
+      });
+    });
+  }
+
+  function drawGaps(g) {
+    $("gap-summary").textContent = g.questions + " questions, " + g.answered + " answered from the docs, " + g.open_tickets + " tickets open.";
+    $("gaps").innerHTML = g.topics.length ? "<table>" + g.topics.map(function (t) {
+      return "<tr><td>" + esc(t.topic) + '<div class="ex">' + t.examples.map(esc).join("<br>") + '</div></td><td class="n">' + t.count + "</td></tr>";
+    }).join("") + "</table>" : '<p class="empty-note">No gaps yet.</p>';
+  }
+
+  function refresh() {
+    api("/api/tickets").then(function (d) { if (d.tickets) drawTickets(d.tickets); });
+    api("/api/gaps?days=7").then(function (g) { if (g.topics) drawGaps(g); });
+  }
+
+  $("fill").addEventListener("click", function () {
+    $("a-title").value = "Payment methods";
+    $("a-heading").value = "Pay with mobile money";
+    $("a-body").value = "You can pay your Brightline bill with mobile money. Open the Brightline app, go to Billing, tap Pay now, and choose Mobile money. Payments show on your account within 15 minutes.";
+  });
+  $("article").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var note = $("a-note");
+    note.className = "note";
+    note.textContent = "Indexing and re-checking open tickets...";
+    api("/api/articles", { method: "POST", body: JSON.stringify({
+      title: $("a-title").value, heading: $("a-heading").value, body: $("a-body").value }) })
+      .then(function (d) {
+        if (d.error) { note.textContent = d.error; return; }
+        note.className = "note good";
+        note.textContent = "Published \"" + d.indexed + "\". " + (d.resolved.length
+          ? "It answered " + d.resolved.length + " open ticket(s): " + d.resolved.map(function (t) { return "#" + t.id; }).join(", ") +
+            ". Those customers hear the answer next time they talk to Alexa."
+          : "No open tickets matched it.");
+        refresh();
+      });
+  });
+  $("reset").addEventListener("click", function () {
+    if (!confirm("Clear all tickets, conversation memory and published articles?")) return;
+    api("/api/reset", { method: "POST" }).then(function () { seen = {}; refresh(); });
+  });
+
+  refresh();
+  setInterval(refresh, 3000);
+})();
+</script>
+</body>
+</html>

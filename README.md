@@ -1,6 +1,6 @@
 # DocDesk: a help-centre add-on for Alexa+
 
-DocDesk lets any brand put its help centre inside Alexa+. Customers ask a question out loud and get a short spoken answer taken only from the brand's own help articles, with the exact source section shown on screen. When the help centre does not cover the question, DocDesk opens a support ticket instead of guessing, remembers it for that customer, and tells them the answer the next time they talk to Alexa.
+DocDesk lets any brand put its help centre inside Alexa+. Customers ask a question out loud and get a short spoken answer taken only from the brand's own help articles, with the exact source section shown on screen. When the answer involves the brand's app, DocDesk does not just read out directions: it shows the app screen, puts a glow on exactly where to tap, and talks the customer through it one step at a time. When the help centre does not cover the question, DocDesk opens a support ticket instead of guessing, remembers it for that customer, and tells them the answer the next time they talk to Alexa.
 
 Built for the **Alexa+ track** of Build, Ship, Shape: Amazon Developer Hackathon 2026, with the **AWS Builder** mini challenge (Strands Agents SDK host, Amazon Bedrock) and the **Open Source** mini challenge ([mcp-lite](https://github.com/Okorodavid/mcp-lite)).
 
@@ -17,10 +17,11 @@ Brands pay for the same questions to be answered again and again, and nobody can
 ## What DocDesk does
 
 1. **Answers only from the help centre.** Every answer cites the section it came from. If no section covers the question, it does not guess.
-2. **Hands off to a human.** Unanswered questions become tickets for the support team. Similar follow-ups join the existing ticket instead of opening duplicates.
-3. **Remembers each customer across sessions.** "Any news on my tickets?" works days later, and each customer only ever sees their own tickets.
-4. **Closes the loop by itself.** When the support team publishes a new article, DocDesk re-checks every open ticket against it. Tickets the new article answers are resolved automatically, and the customer hears "Good news about ticket 2..." the next time they speak to Alexa.
-5. **Shows the brand its doc gaps.** A staff-only report groups what customers asked that the docs could not answer, so the team knows which article to write next.
+2. **Shows you where to tap.** In-app directions ("open the app, go to Billing, tap Pay now, choose Mobile money") become a guided walkthrough on the answer card: the brand's app screen, a pulsing glow on the place to tap, and Alexa reading each step aloud as the glow moves. Voice-only devices still get the full spoken directions.
+3. **Hands off to a human.** Unanswered questions become tickets for the support team. Similar follow-ups join the existing ticket instead of opening duplicates.
+4. **Remembers each customer across sessions.** "Any news on my tickets?" works days later, and each customer only ever sees their own tickets.
+5. **Closes the loop by itself.** When the support team publishes a new article, DocDesk re-checks every open ticket against it. Tickets the new article answers are resolved automatically, and the customer hears "Good news about ticket 1..." the next time they speak to Alexa, with the walkthrough if the answer has in-app steps.
+6. **Shows the brand its doc gaps.** A staff-only report groups what customers asked that the docs could not answer, so the team knows which article to write next.
 
 ## Demo in two minutes
 
@@ -38,10 +39,10 @@ Open these two pages side by side:
 
 Then:
 
-1. As **Ada**, click "how do I restart my router?". The answer is read aloud and the source card links to the exact help section.
+1. As **Ada**, type "How do I change my Wi-Fi password?". The card shows the Brightline app, the glow moves from the app icon to Wi-Fi to Change password, and each step is read aloud. The source link opens the exact help section.
 2. Click "Can I pay my bill with mobile money?". The help centre does not cover it, so ticket 1 opens.
 3. In the console, click **Fill example**, then **Publish and re-check tickets**. The console reports that the article answered ticket 1.
-4. Back as Ada, ask anything ("Is there a late fee?"). Alexa first delivers the good news about ticket 1, then answers.
+4. Back as Ada, ask "Any updates on my tickets?". Alexa delivers the good news about ticket 1 and walks her through paying with mobile money, step by step.
 5. Switch to **Tunde**: he sees none of Ada's tickets. Switch to **Brightline team** and ask for the doc gaps report; customers get a polite refusal for the same request.
 
 No API key is needed. Without one, DocDesk runs in offline mode: it only answers when one help section clearly covers the question, quoting that section's most relevant sentences. Set `ANTHROPIC_API_KEY` (see `.env.example`) and answers come from Claude, still restricted to the retrieved help sections, and the simulator can let Claude pick the tool like a real Alexa+ host.
@@ -77,9 +78,16 @@ The demo brand, Brightline Internet, is fictional. Its help centre lives in `dem
 | Protocol | `2025-11-25` initialize handshake (MCP Python SDK 2.3.0 also speaks `2026-07-28`) |
 | Tools | `ask_support`, `my_support_tickets`, `add_ticket_details`, `close_ticket`, `support_gaps_report` |
 | MCP Apps | `ui://docdesk/card.html` (`text/html;profile=mcp-app`), bound to the first three customer tools |
-| Results | Spoken text in `content`, plus `structuredContent` for cards |
+| Results | Spoken text in `content`, plus `structuredContent` for cards and guides |
+| Screen vs voice | If the client negotiated MCP Apps, in-app directions are spoken as a short intro and shown as a guided walkthrough; otherwise the full directions are spoken |
 | Customer identity | `X-DocDesk-Customer` header, standing in for the account the host has linked |
 | Staff identity | `X-DocDesk-Staff` header carrying the staff token |
+
+**Guided walkthroughs**
+
+The brand describes its app once in an app map (`demo/app-map.json`): its screens, the buttons and rows on each, and which screen each one opens. When an answer contains in-app directions, `docdesk/guide.py` turns each instruction into a step that points at a real element on a real screen, and adds "Open the app" first when needed. Steps are built only from the cited answer's own words, so the walkthrough never shows a step the help centre did not state. Notes that follow the directions ("every device has to rejoin") are read after the last step.
+
+The card draws the app screen, puts a pulsing glow and a tap ripple on the target, and plays the steps. For each step it sends the host a `docdesk/speak` request and moves on when the host has finished speaking, so the glow and the voice stay in sync. The host starts playback with a `docdesk/notifications/guide-start` notification after reading the intro. Back, Next and Replay buttons work without speech, and the glow has a still version for reduced motion.
 
 **Rules that keep it trustworthy**
 
@@ -98,11 +106,13 @@ The demo brand, Brightline Internet, is fictional. Its help centre lives in `dem
 | `docdesk/memory.py` | Tickets and per-customer conversation memory in SQLite |
 | `docdesk/offline.py` | Keyless extractive answerer |
 | `docdesk/planner.py` | Simulated host brain: rules, or Claude choosing from `tools/list` |
-| `docdesk/cards.py` | The MCP App card |
+| `docdesk/cards.py` | The MCP App card, including the guided walkthrough |
+| `docdesk/guide.py` | Turns in-app directions into steps that point at the brand's app screens |
+| `demo/app-map.json` | The demo brand's app screens and buttons |
 | `communityops/` | Docs crawler, FTS5 index and cited-answer core, reused from the author's Telegram support bot |
 | `web/` | Simulator, console, `mcp-client.js`, `apps-host.js` |
 | `hosts/strands/host.py` | Strands Agents SDK host |
-| `tests/` | 41 tests, including full MCP sessions against the real Streamable HTTP app |
+| `tests/` | 52 tests, including full MCP sessions against the real Streamable HTTP app |
 
 ## Strands Agents host (AWS Builder)
 

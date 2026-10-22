@@ -1,17 +1,15 @@
-# Demo video script (2 minutes 45 seconds)
+# Demo video script (about 2 minutes 50 seconds)
 
-Record the screen at 1920 by 1080 with the simulator on the left and the console in a second tab. Speak the narration yourself; leave "Read replies aloud" on so Alexa's voice is heard. No music.
+The submitted video follows this script. It was recorded with `demo-video/record_demo.py`, which drives the simulator in Microsoft Edge with Playwright and narrates with the Windows voices (David for the narrator, Zira for Alexa). To re-record with your own voice, follow the same order. Leave "Read replies aloud" on so Alexa is heard, and use no music.
 
 Before recording, run `python -m docdesk reset`, then `python -m docdesk serve`, and open `http://127.0.0.1:8765/` and `/console`.
 
-| Time | Screen | Say |
+| Scene | Screen | Narration |
 |---|---|---|
-| 0:00-0:20 | Simulator, empty | "When you're stuck with your internet, you dig through a help site, wait hours for an agent, or get a confident wrong answer from a bot. DocDesk puts a brand's real help centre inside Alexa+, and it never guesses." |
-| 0:20-0:45 | As Ada, click "how do I restart my router?" Point at the source card, click it to open the help section. | "Ada asks how to restart her router. The answer comes only from Brightline's help centre, and the card shows the exact section it used." |
-| 0:45-1:00 | Point at the inspector: initialize, protocolVersion 2025-11-25, tools/list, tools/call. | "This is a real MCP session over Streamable HTTP, spec 2025-11-25. The host picks the ask_support tool, and the card is an MCP App the host renders in a sandbox." |
-| 1:00-1:20 | Click "Can I pay my bill with mobile money?" | "Now something the help centre doesn't cover. Instead of guessing, DocDesk opens ticket 1 for Brightline's support team and remembers it for Ada." |
-| 1:20-1:30 | Switch to Tunde, ask "Any news on my tickets?" | "Tickets are private. Tunde sees none of Ada's." |
-| 1:30-1:55 | Console tab. Ticket 1 is listed. Click Fill example, then Publish. Show "It answered 1 open ticket: #1". | "Brightline's team sees the gap and publishes one short article. DocDesk indexes it and re-checks every open ticket by itself. Ticket 1 is now answered." |
-| 1:55-2:15 | Back to Ada. Ask "Is there a late fee?" Let Alexa speak the good news. | "Next time Ada talks to Alexa, she hears the good news first, then her answer. Nobody had to call her back." |
-| 2:15-2:30 | Switch to Brightline team, ask for the doc gaps report. | "The team gets a report of what customers asked that the docs couldn't answer, grouped by topic. Customers asking for it are refused." |
-| 2:30-2:45 | Terminal running the Strands host command, then the README's real-vs-simulated table. | "The same server works with a Strands Agents host on Amazon Bedrock, and the browser MCP client is open source as mcp-lite. Alexa+ itself is simulated, because add-on tools are partner-only. Everything else you saw is real and tested." |
+| Title | Title card | "This is DocDesk. It puts a brand's help centre inside Alexa+. Answers come only from the brand's own articles, and instead of just reading out directions, Alexa shows you where to tap, step by step." |
+| 1. Where to tap | As Ada, type "Alexa, ask Brightline how do I change my Wi-Fi password?". The card shows the Brightline app, and the glow moves from the app icon to Wi-Fi to Change password while Alexa reads each step. | "Ada asks how to change her Wi-Fi password." Then: "The card shows Brightline's app, with a glow on exactly where to tap, while Alexa says each step. On the right is the real MCP traffic, on the November 2025 spec, over Streamable HTTP." Expand the initialize result in the inspector. |
+| 2. A ticket, not a guess | Type "Can I pay my bill with mobile money?" | "Now a question the help centre doesn't cover." Then: "Instead of guessing, DocDesk opens ticket one for the support team, and remembers it for Ada." |
+| 3. Support publishes | Console: Fill example, then Publish. The note says it answered ticket 1. | "Brightline's support team publishes one short help article, and DocDesk re-checks every open ticket against it, by itself." Then: "The new article answers ticket one." |
+| 4. Good news, then the glow | Back on the simulator as Ada: "Alexa, ask Brightline for any updates on my tickets". Alexa gives the good news, then the glow walks through Billing, Pay now, Mobile money. | "So when Ada asks for an update," Then, after the walkthrough: "she hears the good news, and gets walked through paying, step by step. Nobody had to call her back." |
+| 5. Doc gaps | Switch to Brightline team: "Alexa, ask Brightline what customers are asking that our docs don't cover". | "Staff can also ask what customers wanted that the docs couldn't answer." |
+| Close | Closing card | "The same MCP server also works with a Strands Agents host built for Amazon Bedrock, and the browser client is open source as mcp-lite. Alexa+ itself is simulated. Everything else is real, and tested." |

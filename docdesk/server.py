@@ -15,7 +15,7 @@ from typing import Annotated, Any
 
 from pydantic import Field
 
-from mcp.server.apps import Apps
+from mcp.server.apps import Apps, client_supports_apps
 from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp_types import CallToolResult, TextContent, ToolAnnotations
@@ -74,14 +74,15 @@ def build_server(settings: DocDeskSettings, desk: DocDesk | None = None) -> tupl
             f"Answer a customer's question about {settings.brand} from its official help centre, with the "
             "source sections. If the help centre does not cover it, opens (or adds to) a support ticket for a "
             "human and remembers it for this customer. Also delivers any answers to the customer's earlier "
-            "tickets that arrived since they last spoke."
+            "tickets that arrived since they last spoke. On hosts that show MCP Apps, in-app directions come "
+            "as a step-by-step walkthrough that highlights where to tap on the brand's app screen."
         ),
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False),
     )
     async def ask_support(
         question: Annotated[str, Field(description="The customer's question in their own words.")], ctx: Context
     ) -> CallToolResult:
-        outcome = await desk.ask(_customer(ctx), question)
+        outcome = await desk.ask(_customer(ctx), question, screen=client_supports_apps(ctx))
         return _result(outcome.speech, outcome.to_dict())
 
     @apps.tool(
@@ -95,7 +96,7 @@ def build_server(settings: DocDeskSettings, desk: DocDesk | None = None) -> tupl
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False),
     )
     async def my_support_tickets(ctx: Context) -> CallToolResult:
-        data = desk.my_tickets(_customer(ctx))
+        data = desk.my_tickets(_customer(ctx), screen=client_supports_apps(ctx))
         return _result(data["speech"], data)
 
     @apps.tool(

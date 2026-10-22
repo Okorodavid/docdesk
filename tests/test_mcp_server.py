@@ -24,8 +24,8 @@ async def running(settings):
 
 
 class Conn:
-    def __init__(self, app, headers):
-        self.app, self.headers = app, headers
+    def __init__(self, app, headers, apps=True):
+        self.app, self.headers, self.apps = app, headers, apps
 
     async def __aenter__(self):
         self.http = httpx2.AsyncClient(
@@ -33,7 +33,7 @@ class Conn:
         )
         self._streams = streamable_http_client("http://127.0.0.1:8765/mcp", http_client=self.http)
         streams = await self._streams.__aenter__()
-        self.session = ClientSession(streams[0], streams[1], extensions=APPS)
+        self.session = ClientSession(streams[0], streams[1], extensions=APPS if self.apps else None)
         await self.session.__aenter__()
         self.init = await self.session.initialize()
         return self
@@ -124,3 +124,14 @@ def test_planner_rules():
     assert plan_rules("show me the doc gaps report for the last 14 days")["arguments"] == {"days": 14}
     assert plan_rules("Alexa, ask Brightline what customers are asking that our docs don't cover")["tool"] == "support_gaps_report"
     assert plan_rules("is there a late fee?") == {"tool": "ask_support", "arguments": {"question": "is there a late fee?"}}
+
+
+async def test_guide_follows_the_clients_mcp_apps_support(settings):
+    async with running(settings) as app:
+        async with Conn(app, {"X-DocDesk-Customer": "ada"}) as c:
+            text, data = await c.call("ask_support", {"question": "How do I change my Wi-Fi password?"})
+            assert data["guide"]["steps"][-1]["target"] == "wifi-password"
+            assert text.endswith("I'll show you where to tap, step by step.")
+        async with Conn(app, {"X-DocDesk-Customer": "tunde"}, apps=False) as c:
+            text, data = await c.call("ask_support", {"question": "How do I change my Wi-Fi password?"})
+            assert "tap Change password" in text

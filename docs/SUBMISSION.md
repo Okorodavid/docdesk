@@ -6,7 +6,7 @@ DocDesk: your help centre, inside Alexa+
 
 ## Tagline (short)
 
-Brands plug in their help centre. Customers ask Alexa+ and get cited answers, tickets that remember them, and good news when the docs catch up.
+Brands plug in their help centre. Customers ask Alexa+ and get cited answers, a glowing step-by-step guide to where to tap, and tickets that remember them.
 
 ## Tracks
 
@@ -20,6 +20,7 @@ Brands plug in their help centre. Customers ask Alexa+ and get cited answers, ti
 **What DocDesk does.** DocDesk is a self-hosted MCP server that turns any brand's help centre into an Alexa+ add-on.
 
 - It answers only from the brand's own help articles, in short spoken sentences, and shows the exact source section on screen. An answer without a valid source is never spoken.
+- It shows you where to tap instead of only telling you. When an answer involves the brand's app ("open the app, go to Billing, tap Pay now, choose Mobile money"), the card shows the app screen with a pulsing glow on the exact place to tap, and Alexa reads each step aloud as the glow moves through the app. Voice-only devices still get the full spoken directions.
 - When the help centre does not cover a question, it opens a support ticket instead of guessing. Follow-ups on the same topic join the existing ticket.
 - It remembers each customer across sessions. "Any news on my tickets?" works days later, and customers only ever see their own tickets.
 - It closes the loop on its own. When the support team publishes a new article, DocDesk re-checks every open ticket against it, resolves the ones it now answers, and tells each customer the next time they talk to Alexa: "Good news about ticket 1..."
@@ -29,22 +30,23 @@ Brands plug in their help centre. Customers ask Alexa+ and get cited answers, ti
 
 - **MCP server:** Python, MCP SDK 2.3.0, Streamable HTTP at `/mcp`, MCP spec 2025-11-25 handshake, stateful sessions. Five tools: `ask_support`, `my_support_tickets`, `add_ticket_details`, `close_ticket`, and the staff-only `support_gaps_report`.
 - **MCP Apps:** the answer, ticket and gaps views are an MCP Apps card (`ui://docdesk/card.html`) bound to the tools. Every tool also returns complete spoken text, so voice-only hosts lose nothing.
+- **Guided walkthroughs:** the brand describes its app once (screens, buttons, and what each opens). DocDesk turns the in-app directions in a cited answer into steps that each point at a real button on a real screen, using only the answer's own words. The server checks whether the client negotiated MCP Apps: if it did, Alexa speaks a short intro and the card plays the walkthrough, asking the host to read each step (`docdesk/speak`) so the glow and the voice stay in sync. If it did not, the full directions are spoken.
 - **Retrieval and answers:** a SQLite FTS5 index of the help centre, split by heading so citations deep-link to a section. With an API key, Claude writes the spoken answer from the retrieved sections only, as structured output with citations, and anything uncited or low-confidence becomes a ticket. Without a key, an offline extractive mode quotes the best-matching section, so the whole demo runs with no credentials.
 - **Memory:** tickets, per-customer turns and a question log in the same SQLite file.
 - **Alexa+ simulator:** the hackathon FAQ confirms that the Alexa+ add-on tools are partner-only, so the demo uses a web page that is a real MCP client (initialize, tools/list, tools/call over Streamable HTTP) and a real MCP Apps host (it reads the `ui://` resource and renders it in a sandboxed iframe). A "host brain" picks the tool, either by rules or by letting Claude choose from the live `tools/list`. The inspector panel shows every JSON-RPC message.
 - **Strands Agents host (AWS Builder):** a second host built on the Strands Agents SDK connects to DocDesk as an MCP client over Streamable HTTP. With AWS credentials, a Strands agent on Amazon Bedrock (Amazon Nova Pro by default) chooses the DocDesk tool. Without credentials it calls the MCP tools directly through Strands.
-- **Tests:** 41 tests, including full MCP sessions against the real Streamable HTTP app with the official MCP client.
+- **Tests:** 52 tests, including full MCP sessions against the real Streamable HTTP app with the official MCP client.
 
 **What is real and what is simulated.** The MCP server, tools, MCP App, answering, tickets, memory and automatic re-check are real and tested. Alexa+ itself is simulated, because add-on tooling is partner-only. Customer identity is a header that stands in for the linked Alexa account. The Bedrock and Claude model paths are written but were not run live during the build, because the hackathon AWS credits had run out and no keys were available; the offline paths were run. The demo brand, Brightline Internet, is fictional.
 
-**Built during the hackathon.** The retrieval and cited-answer core (`communityops/`) comes from my Telegram support bot, written on 21 October 2026, inside the submission window. Everything in `docdesk/`, `web/` and `hosts/` was built on 22 October 2026 for this submission: the MCP server, tools, MCP App card, ticket memory, automatic re-check, gaps report, simulator, console, Strands host and tests.
+**Built during the hackathon.** The retrieval and cited-answer core (`communityops/`) comes from my Telegram support bot, written on 21 October 2026, inside the submission window. Everything in `docdesk/`, `web/` and `hosts/` was built on 22 October 2026 for this submission: the MCP server, tools, MCP App card, guided walkthroughs, ticket memory, automatic re-check, gaps report, simulator, console, Strands host and tests.
 
 ## Open Source mini challenge fields
 
 - Contribution URL: https://github.com/Okorodavid/mcp-lite
 - Project repository URL: https://github.com/Okorodavid/docdesk
 - GitHub username: Okorodavid
-- Description: **mcp-lite** is a new MIT-licensed, dependency-free MCP client for the browser over Streamable HTTP, plus a minimal MCP Apps host. The client speaks the 2025-11-25 handshake, keeps `Mcp-Session-Id`, sends `MCP-Protocol-Version`, and reads both JSON and SSE responses, so a plain web page can talk to any Streamable HTTP MCP server without a build step. The Apps host reads a tool's `ui://` resource, renders it in a sandboxed iframe, and implements the postMessage handshake (`ui/initialize`, tool-input, tool-result, size-changed, open-link). It matters because most MCP clients are Node or Python libraries; mcp-lite lets anyone build a browser-based MCP host or simulator in one script tag. It powers DocDesk's Alexa+ simulator and includes tests and an example.
+- Description: **mcp-lite** is a new MIT-licensed, dependency-free MCP client for the browser over Streamable HTTP, plus a minimal MCP Apps host. The client speaks the 2025-11-25 handshake, keeps `Mcp-Session-Id`, sends `MCP-Protocol-Version`, and reads both JSON and SSE responses, so a plain web page can talk to any Streamable HTTP MCP server without a build step. The Apps host reads a tool's `ui://` resource, renders it in a sandboxed iframe, implements the postMessage handshake (`ui/initialize`, tool-input, tool-result, size-changed, open-link), and lets the page handle app-specific requests and notifications through hooks. It matters because most MCP clients are Node or Python libraries; mcp-lite lets anyone build a browser-based MCP host or simulator in one script tag. It powers DocDesk's Alexa+ simulator and includes tests and an example.
 
 ## AWS Builder answer (put this in Product Feedback too)
 

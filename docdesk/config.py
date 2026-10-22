@@ -37,6 +37,7 @@ class DocDeskSettings:
     top_k: int = 6
     staff_token: str = field(default_factory=lambda: secrets.token_urlsafe(12))
     demo_docs_dir: Path = ROOT / "demo" / "docs"
+    app_map_path: Path = ROOT / "demo" / "app-map.json"  # the brand's app screens, for guided steps
 
     @property
     def base_url(self) -> str:
@@ -85,6 +86,8 @@ def load_settings(env_file: str | os.PathLike | None = ".env") -> DocDeskSetting
         effort=env("EFFORT") or "low",
         top_k=int(env("TOP_K") or 6),
     )
+    if env("APP_MAP"):
+        s.app_map_path = Path(env("APP_MAP"))
     if env("STAFF_TOKEN"):
         s.staff_token = env("STAFF_TOKEN")
     if not _bool(env("USE_DEMO_DOCS"), True):

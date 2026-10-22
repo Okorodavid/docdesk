@@ -117,15 +117,37 @@
     conversation.scrollTop = conversation.scrollHeight;
   }
 
+  // Speak text and resolve when it has been said. window.recordSpeak is a hook the demo
+  // recorder installs; it returns how many seconds the line takes.
   function speak(text) {
-    if (!$("speak").checked || !window.speechSynthesis) { light(""); return; }
-    speechSynthesis.cancel();
-    var u = new SpeechSynthesisUtterance(text);
-    u.rate = 1.03;
-    u.onstart = function () { light("speaking"); };
-    u.onend = u.onerror = function () { light(""); };
-    speechSynthesis.speak(u);
+    if (window.recordSpeak) {
+      light("speaking");
+      return window.recordSpeak(text).then(function (seconds) {
+        return new Promise(function (r) { setTimeout(function () { light(""); r(); }, Math.max(0, seconds) * 1000); });
+      });
+    }
+    if (!$("speak").checked || !window.speechSynthesis) {
+      // Muted: pause about as long as reading the line would take, so steps stay on screen.
+      var secs = Math.min(8, Math.max(1.4, text.split(/\s+/).length / 2.8));
+      light("");
+      return new Promise(function (r) { setTimeout(r, secs * 1000); });
+    }
+    return new Promise(function (resolve) {
+      var u = new SpeechSynthesisUtterance(text);
+      u.rate = 1.03;
+      u.onstart = function () { light("speaking"); };
+      u.onend = u.onerror = function () { light(""); resolve(); };
+      speechSynthesis.speak(u);
+    });
   }
+
+  // Runs the card's guided walkthrough: the card asks the host to read each step aloud.
+  function guideIn(sc) {
+    if (sc.status === "answered" && sc.guide) return sc.guide;
+    var u = (sc.updates || []).filter(function (x) { return x.guide; })[0];
+    return u ? u.guide : null;
+  }
+  window.__turns = 0;
 
   async function say(text) {
     text = (text || "").trim();
@@ -165,16 +187,34 @@
       alexa.appendChild(el("div", "said", speech));
       addNode(alexa);
       var tool = s.tools.filter(function (x) { return x.name === plan.tool; })[0];
-      var frame = await McpAppsHost.renderApp(s.client, tool, plan.arguments, result, alexa);
+      var guideDone;
+      var finished = new Promise(function (r) { guideDone = r; });
+      var frame = await McpAppsHost.renderApp(s.client, tool, plan.arguments, result, alexa, {
+        hostName: "docdesk-alexa-simulator",
+        onRequest: function (method, params) {
+          if (method === "docdesk/speak") return speak(String(params.text || "").slice(0, 500)).then(function () { return {}; });
+        },
+        onNotification: function (method) { if (method === "docdesk/notifications/guide-finished") guideDone(); },
+      });
       if (frame) step("Rendered the MCP App card " + code(tool._meta.ui.resourceUri) + " in a sandboxed iframe");
       setTimeout(function () { conversation.scrollTop = conversation.scrollHeight; }, 500);
-      speak(speech);
+      var guide = frame && guideIn(sc);
+      busy = false;
+      await speak(speech);
+      if (guide) {
+        step("Guided walkthrough: " + guide.steps.length + " steps, with the place to tap glowing on the " + guide.app + " screen");
+        await frame.ready;
+        frame.notify("docdesk/notifications/guide-start", {});
+        await Promise.race([finished, new Promise(function (r) { setTimeout(r, 90000); })]);
+      }
+      window.__turns++;
     } catch (err) {
       var bad = el("div", "bubble alexa error");
       bad.appendChild(el("div", "who", "Error"));
       bad.appendChild(el("div", "said", String(err.message || err)));
       addNode(bad);
       light("");
+      window.__turns++;
     } finally {
       busy = false;
     }

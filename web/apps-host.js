@@ -1,7 +1,7 @@
 /*
  * A small MCP Apps host: renders a tool's ui:// resource in a sandboxed iframe and talks to
  * it over postMessage JSON-RPC (ui/initialize, tool-input, tool-result, size-changed,
- * open-link). MIT licensed.
+ * open-link). App-specific requests and notifications can be handled through hooks. MIT licensed.
  */
 (function (global) {
   "use strict";
@@ -20,8 +20,16 @@
     return cache[uri];
   }
 
-  // Render a tool result into container using the tool's MCP App. Returns the iframe.
-  async function renderApp(client, tool, args, result, container) {
+  /*
+   * Render a tool result into container using the tool's MCP App. Returns the iframe, or null
+   * when the tool has no UI. The iframe gets two helpers:
+   *   frame.ready             a promise that settles once the app has the tool result
+   *   frame.notify(m, params) send the app a notification
+   * options.onRequest(method, params) may return a promise for app requests the host supports;
+   * options.onNotification(method, params) receives app notifications.
+   */
+  async function renderApp(client, tool, args, result, container, options) {
+    options = options || {};
     var uri = tool && tool._meta && tool._meta.ui && tool._meta.ui.resourceUri;
     if (!uri) return null;
     var html = await loadResource(client, uri);
@@ -31,23 +39,27 @@
     frame.setAttribute("title", (tool.title || tool.name) + " card");
     frame.className = "app-frame";
     frame.style.height = "80px";
-    var delivered = false;
+    var delivered = false, markReady;
+    frame.ready = new Promise(function (r) { markReady = r; });
 
-    function post(msg) { frame.contentWindow.postMessage(Object.assign({ jsonrpc: "2.0" }, msg), "*"); }
+    function post(msg) { if (frame.contentWindow) frame.contentWindow.postMessage(Object.assign({ jsonrpc: "2.0" }, msg), "*"); }
+    frame.notify = function (method, params) { post({ method: method, params: params || {} }); };
     function deliver() {
       if (delivered) return;
       delivered = true;
       post({ method: "ui/notifications/tool-input", params: { arguments: args } });
       post({ method: "ui/notifications/tool-result", params: result });
+      setTimeout(markReady, 50);
     }
 
     function onMessage(e) {
       if (e.source !== frame.contentWindow) return;
       var m = e.data || {};
+      if (!m.method) return;
       if (m.method === "ui/initialize") {
         post({ id: m.id, result: {
           protocolVersion: "2026-01-26",
-          hostInfo: { name: "docdesk-alexa-simulator", version: "1.0.0" },
+          hostInfo: { name: options.hostName || "mcp-apps-host", version: "1.1.0" },
           hostCapabilities: { openLinks: {} },
           hostContext: { theme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light", displayMode: "inline" },
         } });
@@ -62,8 +74,16 @@
         var url = m.params && m.params.url;
         if (/^https?:\/\//.test(url || "")) window.open(url, "_blank", "noopener");
         if (m.id !== undefined) post({ id: m.id, result: {} });
-      } else if (m.id !== undefined && m.method) {
-        post({ id: m.id, error: { code: -32601, message: "Method not supported by this host: " + m.method } });
+      } else if (m.id !== undefined) {
+        var handled = options.onRequest && options.onRequest(m.method, m.params || {});
+        if (handled && typeof handled.then === "function") {
+          handled.then(function (r) { post({ id: m.id, result: r || {} }); },
+                       function (err) { post({ id: m.id, error: { code: -32603, message: String(err && err.message || err) } }); });
+        } else {
+          post({ id: m.id, error: { code: -32601, message: "Method not supported by this host: " + m.method } });
+        }
+      } else if (options.onNotification) {
+        options.onNotification(m.method, m.params || {});
       }
     }
     window.addEventListener("message", onMessage);

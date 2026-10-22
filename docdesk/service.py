@@ -14,6 +14,7 @@ from communityops.store import Store
 
 from .config import DocDeskSettings
 from .memory import ANSWERED_BY_DOCS, CLOSED, OPEN, RESOLVED_BY_AGENT, Memory, Ticket, content_words
+from .guide import build_guide, load_app_map
 from .offline import OfflineAnswerer
 
 VOICE_SYSTEM_TEMPLATE = """You are the {project} customer-support add-on inside a voice assistant. \
@@ -64,11 +65,13 @@ class Update:
     answer: str
     resolved_by: str
     sources: list[Source] = field(default_factory=list)
+    guide: dict | None = None
 
     def to_dict(self) -> dict:
         return {
             "ticket_id": self.ticket_id, "question": self.question, "answer": self.answer,
             "resolved_by": self.resolved_by, "sources": [s.to_dict() for s in self.sources],
+            "guide": self.guide,
         }
 
 
@@ -82,6 +85,7 @@ class AskOutcome:
     updates: list[Update] = field(default_factory=list)
     first_visit: bool = False
     mode: str = ""
+    guide: dict | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -93,6 +97,7 @@ class AskOutcome:
             "updates": [u.to_dict() for u in self.updates],
             "first_visit": self.first_visit,
             "answer_mode": self.mode,
+            "guide": self.guide,
         }
 
 
@@ -124,6 +129,11 @@ class DocDesk:
             self.answerer = OfflineAnswerer(self.store, top_k=settings.top_k)
             self.mode = "offline (no API key: quotes the best-matching help section)"
         self._lock = asyncio.Lock()
+        self.app_map = load_app_map(str(settings.app_map_path))
+
+    def guide_for(self, answer: str) -> dict | None:
+        """A step-by-step, point-at-the-screen guide for the in-app directions in an answer."""
+        return build_guide(answer, self.app_map)
 
     # ------------------------------------------------------------- helpers
     def _titles(self) -> dict[str, str]:
@@ -135,7 +145,9 @@ class DocDesk:
         out = []
         for url in urls:
             page = url.split("#")[0]
-            heading = url.split("#")[1].replace("-", " ").capitalize() if "#" in url else ""
+            row = self.store.conn.execute("SELECT heading FROM chunks WHERE url = ? LIMIT 1", (url,)).fetchone()
+            heading = (row["heading"] if row else "") or (
+                url.split("#")[1].replace("-", " ").capitalize() if "#" in url else "")
             title = titles.get(page, page.rsplit("/", 1)[-1])
             out.append(Source(f"{title}: {heading}" if heading else title, url))
         return out
@@ -144,18 +156,21 @@ class DocDesk:
         tickets = self.memory.unnotified_resolutions(customer_id)
         self.memory.mark_notified([t.id for t in tickets])
         return [
-            Update(t.id, t.question, t.resolution, t.resolved_by, self._sources(t.resolution_sources))
+            Update(t.id, t.question, t.resolution, t.resolved_by, self._sources(t.resolution_sources),
+                   self.guide_for(t.resolution))
             for t in tickets
         ]
 
     @staticmethod
-    def _updates_speech(updates: list[Update]) -> str:
+    def _updates_speech(updates: list[Update], screen: bool = False) -> str:
+        """Spoken 'good news' lines. On a screen with a guide, the steps are shown instead of read out."""
         if not updates:
             return ""
         lines = []
         for u in updates:
             who = "the help guides were updated" if u.resolved_by == "docs" else "the support team replied"
-            lines.append(f"Good news about ticket {u.ticket_id}, '{u.question}': {who}. {u.answer}")
+            body = u.guide["intro"] if (screen and u.guide) else u.answer
+            lines.append(f"Good news about ticket {u.ticket_id}, '{u.question}': {who}. {body}")
         return " ".join(lines) + " Now, about what you just asked: "
 
     def _log(self, customer_id: str, question: str, result: Result) -> None:
@@ -168,20 +183,23 @@ class DocDesk:
         )
 
     # ------------------------------------------------------------- customer side
-    async def ask(self, customer_id: str, question: str) -> AskOutcome:
+    async def ask(self, customer_id: str, question: str, screen: bool = False) -> AskOutcome:
+        """screen: the host can show the answer card, so in-app directions become a guided walkthrough."""
         question = question.strip()
         first = self.memory.touch_customer(customer_id)
         self.memory.add_turn(customer_id, "customer", question)
         updates = self._collect_updates(customer_id)
-        prefix = self._updates_speech(updates)
+        prefix = self._updates_speech(updates, screen)
 
         result = await self.answerer.answer(question)
         self._log(customer_id, question, result)
 
         if result.status == "answered":
             text = answer_text(result)
-            outcome = AskOutcome("answered", prefix + text, text, self._sources(result.sources),
-                                 updates=updates, first_visit=first, mode=self.mode)
+            guide = self.guide_for(text)
+            spoken = guide["intro"] if (screen and guide) else text
+            outcome = AskOutcome("answered", prefix + spoken, text, self._sources(result.sources),
+                                 updates=updates, first_visit=first, mode=self.mode, guide=guide)
         else:
             similar = self.memory.find_similar_open(customer_id, question)
             if similar is not None:
@@ -197,14 +215,14 @@ class DocDesk:
         self.memory.add_turn(customer_id, "docdesk", outcome.speech)
         return outcome
 
-    def my_tickets(self, customer_id: str) -> dict:
+    def my_tickets(self, customer_id: str, screen: bool = False) -> dict:
         self.memory.touch_customer(customer_id)
         updates = self._collect_updates(customer_id)
         open_tickets = self.memory.for_customer(customer_id, statuses=(OPEN,))
         if not open_tickets and not updates:
             speech = "You don't have any open support tickets."
         else:
-            parts = [self._updates_speech(updates).replace(" Now, about what you just asked: ", "").strip()] if updates else []
+            parts = [self._updates_speech(updates, screen).replace(" Now, about what you just asked: ", "").strip()] if updates else []
             if open_tickets:
                 n = len(open_tickets)
                 listed = "; ".join(f"ticket {t.id}, about '{t.question}'" for t in open_tickets[:3])
@@ -283,7 +301,8 @@ class DocDesk:
         if topics:
             top = topics[0]
             speech = (
-                f"In the last {days:g} days customers asked {total} questions and {answered} were answered "
+                f"In the last {days:g} days customers asked {total} question{'s' if total != 1 else ''} and "
+                f"{answered} {'was' if answered == 1 else 'were'} answered "
                 f"from the help guides. The biggest gap is '{top['topic']}', asked {top['count']} "
                 f"time{'s' if top['count'] > 1 else ''}. {open_count} ticket{'s are' if open_count != 1 else ' is'} open."
             )

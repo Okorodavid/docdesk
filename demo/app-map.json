@@ -1,0 +1,93 @@
+{
+  "app": "Brightline app",
+  "start": "launcher",
+  "screens": {
+    "launcher": {
+      "title": "",
+      "layout": "launcher",
+      "elements": [
+        {"id": "app-messages", "label": "Messages", "kind": "icon", "color": "#3fb950"},
+        {"id": "app-camera", "label": "Camera", "kind": "icon", "color": "#8b949e"},
+        {"id": "app-brightline", "label": "Brightline app", "aliases": ["the app", "brightline"], "kind": "icon", "color": "#0a7ea4", "opens": "home"},
+        {"id": "app-maps", "label": "Maps", "kind": "icon", "color": "#d29922"},
+        {"id": "app-music", "label": "Music", "kind": "icon", "color": "#db61a2"},
+        {"id": "app-settings", "label": "Settings", "kind": "icon", "color": "#6e7681"}
+      ]
+    },
+    "home": {
+      "title": "Brightline",
+      "elements": [
+        {"id": "outage-banner", "label": "Home screen banner", "aliases": ["banner"], "kind": "banner", "text": "No outages in your area"},
+        {"id": "nav-devices", "label": "Devices", "kind": "tile", "opens": "devices"},
+        {"id": "nav-wifi", "label": "Wi-Fi", "aliases": ["wifi"], "kind": "tile", "opens": "wifi"},
+        {"id": "nav-billing", "label": "Billing", "kind": "tile", "opens": "billing"},
+        {"id": "nav-plan", "label": "Plan", "kind": "tile", "opens": "plan"},
+        {"id": "nav-account", "label": "Account", "kind": "tile", "opens": "account"},
+        {"id": "nav-speed", "label": "Speed test", "kind": "tile"}
+      ]
+    },
+    "devices": {
+      "title": "Devices",
+      "elements": [
+        {"id": "device-router", "label": "Your router", "aliases": ["router", "your router"], "kind": "row", "opens": "router"},
+        {"id": "device-tv", "label": "Living room TV", "kind": "row"},
+        {"id": "device-phone", "label": "Phone", "kind": "row"}
+      ]
+    },
+    "router": {
+      "title": "Router",
+      "elements": [
+        {"id": "router-status", "label": "Status: online", "kind": "banner", "text": "Online · solid white light"},
+        {"id": "router-restart", "label": "Restart", "kind": "button"},
+        {"id": "router-reset", "label": "Factory reset", "kind": "row"}
+      ]
+    },
+    "wifi": {
+      "title": "Wi-Fi",
+      "elements": [
+        {"id": "wifi-name", "label": "Network name", "kind": "row"},
+        {"id": "wifi-password", "label": "Change password", "kind": "button"},
+        {"id": "wifi-guest", "label": "Guest network", "kind": "toggle"}
+      ]
+    },
+    "billing": {
+      "title": "Billing",
+      "elements": [
+        {"id": "bill-summary", "label": "Next bill", "kind": "banner", "text": "Next bill due on the 14th"},
+        {"id": "bill-pay", "label": "Pay now", "kind": "button", "opens": "pay"},
+        {"id": "bill-methods", "label": "Payment methods", "kind": "row", "opens": "methods"},
+        {"id": "bill-history", "label": "Bill history", "kind": "row"}
+      ]
+    },
+    "pay": {
+      "title": "Pay now",
+      "elements": [
+        {"id": "pay-card", "label": "Card", "kind": "row"},
+        {"id": "pay-mobile", "label": "Mobile money", "kind": "row"},
+        {"id": "pay-bank", "label": "Bank transfer", "kind": "row"}
+      ]
+    },
+    "methods": {
+      "title": "Payment methods",
+      "elements": [
+        {"id": "methods-card", "label": "Saved card", "kind": "row"},
+        {"id": "methods-autopay", "label": "Autopay", "kind": "toggle"}
+      ]
+    },
+    "plan": {
+      "title": "Plan",
+      "elements": [
+        {"id": "plan-current", "label": "Current plan", "kind": "banner", "text": "Fibre 200 · 200 Mbps"},
+        {"id": "plan-change", "label": "Change plan", "kind": "button"}
+      ]
+    },
+    "account": {
+      "title": "Account",
+      "elements": [
+        {"id": "account-details", "label": "Your details", "kind": "row"},
+        {"id": "account-move", "label": "Move service", "kind": "row"},
+        {"id": "account-signout", "label": "Sign out", "kind": "row"}
+      ]
+    }
+  }
+}
